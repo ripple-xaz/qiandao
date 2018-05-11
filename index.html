@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>签到</title>
+	<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no" />
+	<style type="text/css">
+		* { margin: 0;padding: 0;}
+		.calendar{width:100%;margin:10px 0px 20px 0px;color:#555;position: relative;}
+		.calendar h4 {border-bottom: 2px solid #5bd999;text-align: center;font-size: 22px;font-weight: 700;margin-top: 10px;margin-bottom:0px;padding: 10px 0;}
+		.calendar button {position: absolute;width: 24px;height: 24px;top: 15px;border: none;}
+		.calendar button:focus { border: none;outline: none; }
+		.calendar button.month-less {left: 20px;background: url(img/left-icon.png) no-repeat left -60px;}
+		.calendar button.month-add {right: 20px;background: url(img/right-icon.png) no-repeat left -60px;}
+		.calendar .sign_tab{width: 100%;border-collapse: collapse;border: 1px solid #e8e8e8;border-top: 0;table-layout: fixed;}
+		.calendar .sign_tab th{text-align: center;height: 2.25rem;font-weight: 700;}
+		.calendar .sign_tab td{border: 1px solid #e8e8e8;height: 2.25rem;text-align: center;font-size: 0.8rem;font-family: arial;}
+		.calendar .sign_tab td.over{background-color: #fff;border-left: 0;border-right: 0;}
+		.calendar .sign_tab td.red_tbg{background-color: #f8f8f8;color: #58ce7a;position:relative;}
+		.red_tbg .ui-state-default {font-size: 0.6em;width: 100%;text-align: center; position: absolute;top:1.4rem;left: 0;}
+		.calendar .sign_tab td.cur_day{background-color: #FFD2D2;color: #FFF;}
+	</style>
+	<style type="text/css">
+		.btn{
+			height: 50px;
+			line-height: 50px;
+			text-align: center;
+		}
+		.btn span{
+			display: inline-block;
+			background-color: rgb(0,159,217);
+			text-align: center;
+			color: #fff;
+			padding: 0 20px;
+			font-size: 16px;
+			border-radius: 10px;
+			line-height: 38px;
+		}
+	</style>
+</head>
+<body style="background-color: rgb(50,70,80);">
+
+
+<div style="background-color: #fff; width: 600px;margin: 50px auto;padding: 50px 0;">
+	<div id="box" class="calendar" ></div>
+	<div class="btn">
+		<span id="qiandao">点击签到</span>
+	</div>
+</div>
+
+
+
+<style type="text/css">
+.reitems{
+	line-height:40px;
+}
+</style>
+<div id="login" class="mask" style=" position:absolute;width:100%;height:100%;left:0;top:0;z-index:10000;background-color:rgba(0,0,0,0.5);">
+	<div class="content" style="width:300px;padding:30px 20px;background-color: #fff;position: absolute;left: 50%;transform: translateX(-50%);top: 100px;">
+		<div class="sub_title" style="	line-height: 30px;border-bottom: 1px solid #ddd;font-size: 16px;">
+          <span>请输入用户信息进行验证</span>
+        </div>
+         <div class="reitems" style="position: relative;border: 1px solid #999;text-align: center;margin-top: 20px;">
+          <span id="test-address" style="font-size: 16px;">选择你的钱包</span>
+          <input type="file" id="keyfile" class="reinput" style="position:absolute;opacity: 0;top:0;left:0;width: 100%;height: 100%;" >
+        </div>
+        <div class="reitems">
+          <input type="password" id="password"  style="height: 40px;width:100%;margin: 20px 0;" class="reinput user_password" placeholder="请填写用户密码">
+        </div>
+        <div class="subbtn" style="background-color: #000;color: #fff;text-align: center;line-height: 40px;font-size: 20px;">
+          提交
+        </div>
+	</div>
+</div>
+
+
+
+<script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+<script src="js/neb.js"></script>
+<script src="js/nebulas.js"></script>
+<script src="js/api.js"></script>
+<script src="js/md5.js"></script>
+<script src="calendar.js"></script>
+<script type="text/javascript">
+
+(function(doc,win){  //监听屏幕宽度变化
+	var docEl = doc.documentElement,
+	resizeEvt = "orientationchange" in window ? "orientationchange" : "resize",
+	recalc = function(){
+		var clientWidth = docEl.clientWidth;
+		if(!clientWidth) return;
+		clientWidth = clientWidth > 640 ? 640 : clientWidth;
+		docEl.style.fontSize = 20 * (clientWidth / 320) + "px";
+	};
+	if(!doc.addEventListener) return;
+	win.addEventListener(resizeEvt,recalc,false);
+	doc.addEventListener('DOMContentLoaded', recalc, false);
+})(document,window);
+
+
+var curArray = []
+var curMonthDayArray = []
+var isQianDao = false;
+var farmatedNasDate = null;
+
+var webWalletArray = [];
+
+var date = new Date()
+var day =  date.getDate()
+var month = date.getMonth() 
+var year = date.getFullYear()
+
+let curFormedDate = {  //当前时间{year:2018,month:06,day:09}
+	year:year,
+	month:month+1,
+	day:day
+}
+
+
+
+function formateDate(result){  //将20180609转换成{year:2018,month:06,day:09}
+	if(result || result === []){
+		result = result.map(function(v,i){
+			return {
+				year:parseInt(v.toString().substring(0,4)),
+				month:parseInt(v.toString().substring(4,6)),
+				day:parseInt(v.toString().substring(6))
+			}
+		})
+	}else{
+		result = []
+	}
+	
+	return result
+}
+function getCurMonthDay(result,month){ //获取当月格式{year:2018,month:06,day:09}的所有签到日历
+	console.log(result)
+	console.log(month)
+	var dayArray = []
+	result.forEach(function(v,i){
+		if( v.month == month ){
+			dayArray.push(v.day)
+		}
+	})
+	return dayArray
+}
+function getChangeDate(direct){ //str为‘2018-05-01’
+	var str = $('h4').text()
+	var year = str.substring(0,5)
+	var month = str.split('月')[0].substring(5)
+	console.log(year,month)
+	if(direct){
+		return parseInt(month)-1
+	}else{
+		return parseInt(month)+1
+	}
+	
+}
+
+var Calendar = new Calendar('box', {
+	curDate: new Date(),
+	getNextMonthArr: function(e) {
+		return getCurMonthDay(farmatedNasDate,getChangeDate(0))
+		
+	},
+	getPrevMonthArr: function(e) {
+		return getCurMonthDay(farmatedNasDate,getChangeDate(1))
+		
+	}
+});
+
+Calendar.init([]);
+
+
+
+
+
+
+
+
+
+
+	
+
+
+function getday(){
+	var curDate = new Date()
+	date = curDate.getDate()
+	timeStamp =  curDate.getTime()
+	return {
+		date:date,timeStamp:timeStamp
+	}
+}
+function qiandao(){
+	var date = getday()['date']
+	curArray.push(date)
+	Calendar.init(curArray);
+}
+
+
+window.onload = function(){
+	$('#qiandao').on('click',function(){ //签到
+		if(isQianDao){
+			alert('您已经签到')
+			return
+		}
+
+		
+		webGetNonce(config)
+		.then(function(data){
+			console.log('-----------------查询nonce-------config---------')
+			console.log(data)
+			console.log('-----------------查询nonce-------config---------')
+			var nonce = data.nonce
+			config.account = account
+			config.nonce = parseInt(nonce)+1
+			config.func = 'clockIn'
+
+			console.log(curFormedDate)
+
+			config.args = "["+curFormedDate.year+proccessMonthDay(curFormedDate.month)+proccessMonthDay(curFormedDate.day)+"]"
+			console.log('-----------------发送交易------config----------')
+			console.log(config)
+			console.log('-----------------发送交易------config----------')
+			webTransaction(config)
+			.then(function(data){
+				console.log(data)
+				$('#qiandao').text('已签到')
+				curMonthDayArray.push(curFormedDate.day)
+				Calendar.init(curMonthDayArray);
+				isQianDao = true
+			})
+			function proccessMonthDay(str){
+				return str<10? '0'+str:str
+			}
+		})
+
+		// $('#login').show()
+	})
+
+	$('#keyfile').on('change',function(e) {
+		getKeyFile(this,e)
+		.then(function(data){
+			if(data.ret != 0 ){
+				alert(data.msg)
+			}else{
+				keyfile = data.keyfile
+			}
+		})
+	});
+
+
+	$('.subbtn').click(function(event) { //提交登录
+			if(isQianDao){
+				
+				return
+			}
+			console.log(keyfile)
+			var password = $('#password').val()
+			validateWallet(keyfile,password)
+			.then(function(data){
+				if(data.ret != 0 ){
+					alert(data.msg)
+				}else{
+					alert(data.msg);
+					config.account = data.account
+					config.userAddress = data.userAddress
+					webGetNonce(config)
+					.then(function(data){
+						config.nonce = parseInt(data.nonce)+1
+						webCall(config)
+						.then(function(data){
+							console.log('---------------------查询签到日志-------------------')
+							console.log(data)
+							console.log('---------------------查询签到日志-------------------')
+							var result = JSON.parse(data.result)
+							result = formateDate(result)
+							farmatedNasDate = result
+							console.log('---------------------格式化后返回的date数组-------------------')
+							console.log(farmatedNasDate)
+							console.log('---------------------格式化后返回的date数组-------------------')
+							$('#login').hide();
+							farmatedNasDate.forEach(function(v,i){
+								if(v.year === curFormedDate.year && v.month === curFormedDate.month && v.day === curFormedDate.day){
+									isQianDao = true
+
+									$('#qiandao').text('已签到')
+								}
+							})
+							curMonthDayArray = getCurMonthDay(result,curFormedDate.month)
+							console.log('---------------------当月已签到日历-------------------')
+							console.log(curMonthDayArray)
+							console.log('---------------------当月已签到日历-------------------')
+							Calendar.init(curMonthDayArray);
+							
+						})
+					})
+
+					
+				}
+			})
+	});
+}
+
+</script>
+</body>
+</html>
